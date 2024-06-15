@@ -62,6 +62,7 @@ public class SoCacheServer implements SoCachePlugin {
                         protected void initChannel(SocketChannel ch) throws Exception {
                             ch.pipeline().addLast(new SoCacheDecoder()); //decoder
                             ch.pipeline().addLast(new SoCacheHandler()); //handler
+                            ch.pipeline().addLast(new SoCacheEncoder()); //encoder
                         }
                     });
 

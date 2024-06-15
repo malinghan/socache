@@ -1,11 +1,14 @@
 package com.so.socache.core;
 
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import lombok.extern.slf4j.Slf4j;
 
 /**
  * 命令行处理
+ * https://redis.com.cn/topics/protocol.html
  * @author someecho <linghan.ma@gmail.com>
  * Created on 2024-06-12
  */
@@ -26,8 +29,10 @@ public class SoCacheHandler extends SimpleChannelInboundHandler<String> {
     protected void channelRead0(ChannelHandlerContext ctx, String message) throws Exception {
 
         String[] args = message.split(CRLF);
-        System.out.println("SoCacheHandler =>" + String.join(",",  args));
+        System.out.println("SoCacheHandler => " + String.join(",",  args));
+
         String cmd = args[2].toUpperCase();
+        System.out.println("SoCacheHandler => cmd : " +  cmd);
 
         //1. command
         if ("COMMAND".equals(cmd)) {
@@ -37,17 +42,17 @@ public class SoCacheHandler extends SimpleChannelInboundHandler<String> {
                     + CRLF + "$4"
                     + CRLF + "PING"
                     + CRLF);
-        } else if ("PING".equals(cmd)) {
+        } else if ("PING".equals(cmd)) { //input:  *1,$4,ping
             String ret = "PONG";
             if (args.length >= 5) {
                 ret = args[4];
             }
-            echoString(ctx, ret);
+            simpleString(ctx, ret);
         } else if ("INFO".equals(cmd)) {
             bulkString(ctx, INFO);
         } else if ("SET".equals(cmd)) {
             cache.set(args[4], args[6]);
-            echoString(ctx, OK);
+            simpleString(ctx, OK);
         } else if ("GET".equals(cmd)) {
             String value = cache.get(args[4]);
             bulkString(ctx, value);
@@ -88,11 +93,11 @@ public class SoCacheHandler extends SimpleChannelInboundHandler<String> {
                 vals[i] = args[6 + i * 4];
             }
             cache.mset(keys, vals);
-            echoString(ctx, OK);
+            simpleString(ctx, OK);
         }
         else if ("INCR".equals(cmd)) {
             cache.set(args[4], args[6]);
-            echoString(ctx, OK);
+            simpleString(ctx, OK);
         }
         else if("DECR".equals(cmd)) {
 //            String key = args[4];
@@ -122,18 +127,10 @@ public class SoCacheHandler extends SimpleChannelInboundHandler<String> {
      * @param ctx
      * @param content
      */
-    private void echoString(ChannelHandlerContext ctx, String content) {
+    private void simpleString(ChannelHandlerContext ctx, String content) {
         writeByteBuf(ctx, stringEncode(content));
     }
 
-    /**
-     * example:
-     * null -> $-1\r\n (nill)
-     * "" -> $0\r\n (空字符串)
-     * hello ->  +5\r\nhello\r\n
-     * @param content
-     * @return
-     */
     private static String stringEncode(String content) {
         String ret;
         if ( content == null) {
@@ -141,16 +138,24 @@ public class SoCacheHandler extends SimpleChannelInboundHandler<String> {
         } else if (content.isEmpty()) {
             ret = "$0";
         } else {
-            ret = STRING_PREFIX + content.getBytes().length + CRLF + content;
+           // ret = STRING_PREFIX + content.getBytes().length + CRLF + content;
+            ret = STRING_PREFIX +  content;
         }
         return ret + CRLF;
     }
 
 
 
-    private void writeByteBuf(ChannelHandlerContext ctx, String content) {
-        System.out.println("wrap byte buffer and reply " + content);
-        ctx.writeAndFlush(content + CRLF);
+//    private void writeByteBuf(ChannelHandlerContext ctx, String content) {
+//        System.out.println("wrap byte buffer and reply " + content);
+//        ctx.writeAndFlush(content);
+//    }
+
+    private void writeByteBuf(ChannelHandlerContext ctx, String content){
+        System.out.println("wrap byte buffer and reply: " + content);
+        ByteBuf buffer = Unpooled.buffer(128);
+        buffer.writeBytes(content.getBytes());
+        ctx.writeAndFlush(buffer);
     }
 
    // example : 1 -> :1
