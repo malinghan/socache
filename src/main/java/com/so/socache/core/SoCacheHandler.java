@@ -45,21 +45,34 @@ public class SoCacheHandler extends SimpleChannelInboundHandler<String> {
         } else if ("PING".equals(cmd)) { //input:  *1,$4,ping
             String ret = "PONG";
             if (args.length >= 5) {
+                //*2,$4,PING,$1,A
+                //ret = A
                 ret = args[4];
             }
             simpleString(ctx, ret);
         } else if ("INFO".equals(cmd)) {
+            //SoCache server, [v1.0.0], created by malinghan.
+            //Mock Redis Server, at 2024-06-12, Shenzhen
             bulkString(ctx, INFO);
         } else if ("SET".equals(cmd)) {
+            //SET a a
+            //*3,$3,SET,$1,a,$1,a
+            //args[4] = a args[6] = a
             cache.set(args[4], args[6]);
             simpleString(ctx, OK);
         } else if ("GET".equals(cmd)) {
+            //GET a
+            //*2,$3,GET,$1,a
+            //GET aaa (aaa不存在)
+            //*2,$3,GET,$3,aaa
+            //value = null
             String value = cache.get(args[4]);
             bulkString(ctx, value);
         } else if ("STRLEN".equals(cmd)) {
             String value = cache.get(args[4]);
             integerWriteByteBuf(ctx, value == null ? 0 : value.length());
         } else if ("DEL".equals(cmd)) {
+            //*2,$3,DEL,$1,a
             int len = (args.length-3)/2;
             String[] keys = new String[len];
             for(int i=0; i<len; i++) {
@@ -96,21 +109,24 @@ public class SoCacheHandler extends SimpleChannelInboundHandler<String> {
             simpleString(ctx, OK);
         }
         else if ("INCR".equals(cmd)) {
-            cache.set(args[4], args[6]);
-            simpleString(ctx, OK);
+            String key = args[4];
+            try {
+                integerWriteByteBuf(ctx, cache.incr(key));
+            } catch (NumberFormatException nfe) {
+                simpleString(ctx, "NFE " + key + " value[" + cache.get(key) + "] is not an integer.");
+            }
         }
         else if("DECR".equals(cmd)) {
-//            String key = args[4];
-//            try {
-//                integer(ctx, cache.decr(key));
-//            } catch (NumberFormatException nfe) {
-//                error(ctx, "NFE " + key + " value is not an integer.");
-//            }
+           String key = args[4];
+                try {
+                    integerWriteByteBuf(ctx, cache.decr(key));
+                } catch (NumberFormatException nfe) {
+                    simpleString(ctx, "NFE " + key + " value is not an integer.");
+                }
         }
         else {
-            writeByteBuf(ctx, OK);
+            simpleString(ctx, OK);
         }
-        ctx.writeAndFlush(OK);
     }
 
     /**
@@ -119,7 +135,15 @@ public class SoCacheHandler extends SimpleChannelInboundHandler<String> {
      * @param content
      */
     private void bulkString(ChannelHandlerContext ctx, String content) {
-        writeByteBuf(ctx, "$" + content.getBytes().length + CRLF + content + CRLF);
+        String ret;
+        if ( content == null) {
+            ret = "$-1"  + CRLF;
+        } else if (content.isEmpty()) {
+            ret = "$0" + CRLF;
+        } else {
+            ret = "$" + content.getBytes().length + CRLF + content + CRLF;
+        }
+        writeByteBuf(ctx, ret);
     }
 
     /**
@@ -138,7 +162,6 @@ public class SoCacheHandler extends SimpleChannelInboundHandler<String> {
         } else if (content.isEmpty()) {
             ret = "$0";
         } else {
-           // ret = STRING_PREFIX + content.getBytes().length + CRLF + content;
             ret = STRING_PREFIX +  content;
         }
         return ret + CRLF;

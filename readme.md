@@ -44,3 +44,26 @@ $5\r\nvalue\r\n
 
 **v1.0 处理`redis-cli`输入输出** 
 - 搭建netty server，监听6379端口，获取redis-cli输入,内部处理输入输出
+
+### RESP 输入测试
+- COMMAND
+- PING
+- INFO
+- SET
+- GET
+- STRLEN
+- DEL
+- EXISTS
+- MGET
+- MSET
+- INCR
+- DECR
+
+### 问题记录
+1. 在配置SoCacheServer时，配置pipeline时需要注意channel的类型为SocketChannel，而不是Channel
+![bug01](bug01.png)
+2. NettyServer需要满足输入输出都是字节流，内部处理是字符流，所以需要注意encode和decode
+![bug02-1](bug02-1.png)
+![bug02-2](bug02-2.png)
+3. pom文件不需要引入`spring-boot-starter-web`, 引入spring-boot-starter，避免启动tomcat server
+![bug03](bug03.png)
