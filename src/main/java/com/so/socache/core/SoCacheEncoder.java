@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicLong;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToByteEncoder;
 
@@ -28,14 +29,11 @@ public class SoCacheEncoder extends MessageToByteEncoder<String> {
         System.out.println("SoCacheEncoder wrap byte buffer and reply: " + s);
         System.out.println("SoCacheEncoder encodeCount:" + counter.incrementAndGet());
         System.out.println("SoCacheEncoder s:" + s);
-//        ByteBuf buffer = Unpooled.buffer(128);
-//        buffer.writeBytes(s.getBytes());
-//        ctx.writeAndFlush(buffer);
         if (s == null || s.isEmpty()) {
             return; // 如果消息为空或长度为零，则不进行编码
         }
-        byte[] bytes = s.getBytes(StandardCharsets.UTF_8);
-        out.writeBytes(bytes);
-//        ctx.writeAndFlush(out);
+        ByteBuf buffer = Unpooled.buffer(128);
+        buffer.writeBytes(s.getBytes());
+        ctx.writeAndFlush(buffer);
     }
 }
