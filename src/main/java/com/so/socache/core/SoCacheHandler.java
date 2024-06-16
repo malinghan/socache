@@ -58,6 +58,10 @@ public class SoCacheHandler extends SimpleChannelInboundHandler<String> {
             //SET a a
             //*3,$3,SET,$1,a,$1,a
             //args[4] = a args[6] = a
+            if (args.length < 7) {
+                error(ctx, "SET must have key and value.");
+                return;
+            }
             cache.set(args[4], args[6]);
             simpleString(ctx, OK);
         } else if ("GET".equals(cmd)) {
