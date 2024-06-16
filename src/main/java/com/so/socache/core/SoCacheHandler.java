@@ -90,11 +90,18 @@ public class SoCacheHandler extends SimpleChannelInboundHandler<String> {
             integerWriteByteBuf(ctx, cache.exists(keys));
         }
         else if ("MGET".equals(cmd)) {
+//            SoCacheHandler => *4,$4,MGET,$1,a,$1,b,$1,c
+//            SoCacheHandler => cmd : MGET
+//            wrap byte buffer and reply: *3
+//            $-1
+//            $-1
+//            $-1
             int len = (args.length - 3) / 2;
             String[] keys = new String[len];
             for (int i = 0; i < len; i++) {
                 keys[i] = args[4 + i * 2];
             }
+            //输出是一个数组
             array(ctx, cache.mget(keys));
         }
         else if ("MSET".equals(cmd)) {
@@ -113,7 +120,7 @@ public class SoCacheHandler extends SimpleChannelInboundHandler<String> {
             try {
                 integerWriteByteBuf(ctx, cache.incr(key));
             } catch (NumberFormatException nfe) {
-                simpleString(ctx, "NFE " + key + " value[" + cache.get(key) + "] is not an integer.");
+                error(ctx, "NFE " + key + " value[" + cache.get(key) + "] is not an integer.");
             }
         }
         else if("DECR".equals(cmd)) {
@@ -121,7 +128,7 @@ public class SoCacheHandler extends SimpleChannelInboundHandler<String> {
                 try {
                     integerWriteByteBuf(ctx, cache.decr(key));
                 } catch (NumberFormatException nfe) {
-                    simpleString(ctx, "NFE " + key + " value is not an integer.");
+                    error(ctx, "NFE " + key + " value is not an integer.");
                 }
         }
         else {
@@ -135,15 +142,26 @@ public class SoCacheHandler extends SimpleChannelInboundHandler<String> {
      * @param content
      */
     private void bulkString(ChannelHandlerContext ctx, String content) {
+        writeByteBuf(ctx, bulkStringEncoding(content));
+    }
+
+    /**
+     * 该函数用于根据输入的字符串content生成相应的bulk string格式的字符串。
+     * bulk string是一种Redis协议中使用的数据格式，
+     * 用于表示一个可选的字符串值。函数返回的字符串以`$
+     * @param content
+     * @param content
+     */
+    private String bulkStringEncoding(String content) {
         String ret;
         if ( content == null) {
             ret = "$-1"  + CRLF;
         } else if (content.isEmpty()) {
             ret = "$0" + CRLF;
         } else {
-            ret = "$" + content.getBytes().length + CRLF + content + CRLF;
+            ret = BULK_PREFIX + content.getBytes().length + CRLF + content + CRLF;
         }
-        writeByteBuf(ctx, ret);
+        return ret;
     }
 
     /**
@@ -153,6 +171,14 @@ public class SoCacheHandler extends SimpleChannelInboundHandler<String> {
      */
     private void simpleString(ChannelHandlerContext ctx, String content) {
         writeByteBuf(ctx, stringEncode(content));
+    }
+
+    private void error(ChannelHandlerContext ctx, String msg) {
+        writeByteBuf(ctx, errorEncode(msg));
+    }
+
+    private static String errorEncode(String msg) {
+        return "-" + msg + CRLF;
     }
 
     private static String stringEncode(String content) {
